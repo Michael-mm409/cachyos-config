@@ -25,9 +25,13 @@ else
     fi
 fi
 
-# 3. Touchpad & UI Tuning
+# 3. Touchpad & UI Tuning (KDE Plasma)
 echo "🖱️  Configuring Touchpad and Power Profile..."
-gsettings set org.gnome.desktop.peripherals.touchpad tap-to-click true
+# Enable tap-to-click for KDE Plasma
+mkdir -p "$HOME/.config"
+if ! grep -q "TapToClick=true" "$HOME/.config/touchpadrc" 2>/dev/null; then
+    echo "TapToClick=true" >> "$HOME/.config/touchpadrc"
+fi
 
 # Ensure the 'power-profiles-daemon' is in 'balanced' or 'power-saver'
 if command -v powerprofilesctl &> /dev/null; then

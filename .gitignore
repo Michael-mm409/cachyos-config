@@ -1,0 +1,13 @@
+# Sensitive Data
+keys/
+*.key
+id_ed25519*
+secrets.sh
+
+# Logs
+*.log
+push_log.txt
+.setup-cachyos.sh.kate-swp
+
+# OS Junk
+.DS_Store

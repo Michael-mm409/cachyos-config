@@ -1,33 +1,38 @@
 #!/bin/bash
-# uni-sync.sh - Michael's Manual rsync Fallback (CachyOS/Btrfs Edition)
+# Path: /home/michael/cachyos-setup/uni-sync.sh
 
-LOCAL_DIR="$HOME/Documents/University"
-REMOTE_DIR="/mnt/proxmox_uni"
+# --- CONFIGURATION ---
+REMOTE_IP="192.168.8.2" 
+REMOTE_DEST="pve:/home/michael/University" # Updated to point to existing folder
+LOCAL_HDD="/run/media/michael/Rem Backup/University_Backups/" 
+SOURCE="/home/michael/Documents/University/" # Keep trailing slash to follow symlink
+LATENCY_THRESHOLD=10.0 
+LOG="/home/michael/cachyos-setup/sync.log"
 
-echo "🔍 Checking Proxmox Mount ($REMOTE_DIR)..."
+echo "--- Sync Started: $(date) ---" >> $LOG
 
-# 1. Trigger the systemd automount & Check Connectivity
-# We check for a specific directory to ensure it's actually MOUNTED, not just an empty folder
-if ! mountpoint -q "$REMOTE_DIR"; then
-    echo "⚙️  Triggering automount..."
-    ls "$REMOTE_DIR" &>/dev/null
-    sleep 1 # Give systemd a second to catch up
+# --- 1. LOCAL EXTERNAL HDD SYNC ---
+# Check if the WD Gaming Drive is mounted
+if [ -d "/run/media/michael/Rem Backup/" ]; then
+    echo "$(date) - WD Drive detected. Starting local backup..." >> $LOG
+    rsync -avzuL --partial --delete \
+        --exclude=".venv/" --exclude="__pycache__/" \
+        "$SOURCE" "/run/media/michael/Rem Backup/University/" >> $LOG 2>&1
+else
+    echo "$(date) - WD Drive NOT found. Skipping local backup." >> $LOG
 fi
 
-if [ ! -d "$REMOTE_DIR" ] || [ -z "$(ls -A "$REMOTE_DIR")" ]; then
-    echo "❌ Proxmox University mount not reachable or empty. Is Tailscale up?"
-    exit 1
+# --- 2. REMOTE MINI-PC SYNC ---
+# Check latency to the 'Brain'
+LATENCY=$(ping -c 3 $REMOTE_IP | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+
+if [ ! -z "$LATENCY" ] && (( $(echo "$LATENCY < $LATENCY_THRESHOLD" | bc -l) )); then
+    echo "$(date) - Mini-PC detected (${LATENCY}ms). Starting network backup..." >> $LOG
+    rsync -avzuL --partial --delete \
+        --exclude=".venv/" --exclude="__pycache__/" \
+        "$SOURCE" "$REMOTE_DEST" >> $LOG 2>&1
+else
+    echo "$(date) - Mini-PC unreachable or high latency. Skipping network backup." >> $LOG
 fi
 
-# 2. Two-way sync (Pull then Push)
-# Added --modify-window=1 to prevent "false positive" re-copies on network shares
-# Added --delete to keep things clean (optional, remove if you want to keep deleted files)
-COMMON_FLAGS="-avzu --no-perms --no-owner --no-group --modify-window=1 --exclude=.conda/ --exclude=__pycache__/"
-
-echo "📥 [1/2] Pulling updates from Proxmox..."
-rsync $COMMON_FLAGS "$REMOTE_DIR/" "$LOCAL_DIR/"
-
-echo "📤 [2/2] Pushing local changes to Proxmox..."
-rsync $COMMON_FLAGS "$LOCAL_DIR/" "$REMOTE_DIR/"
-
-echo "✅ Manual sync complete."
+echo "--- All Sync Tasks Finished: $(date) ---" >> $LOG

@@ -23,21 +23,27 @@ alias uni-status='mutagen sync list; and echo "--- Hub Connectivity ---"; and pi
 
 # 1. LEFT SIDE: Environment (CONDA), User, Host, and Path
 function fish_prompt
+    # Conda Env in Bright Yellow
     if set -q CONDA_DEFAULT_ENV
-        set_color yellow
+        set_color bryellow
         echo -n "($CONDA_DEFAULT_ENV) "
         set_color normal
     end
 
-    set_color blue
-    echo -n "["(whoami)
+    # [User@Host Path]
+    set_color brblue
+    echo -n "["
+    set_color brgreen  # User in Bright Green
+    echo -n (whoami)
     set_color white
     echo -n "@"
-    set_color magenta
-    echo -n (hostname)" "
-    set_color yellow
+    set_color brmagenta # Host in Bright Magenta
+    echo -n (hostname)
+    set_color normal
+    echo -n " "
+    set_color brcyan # Path in Bright Cyan
     echo -n (prompt_pwd)
-    set_color blue
+    set_color brblue
     echo -n "]"
     set_color normal
     echo -n "\$ "
@@ -45,13 +51,16 @@ end
 
 # 2. RIGHT SIDE: Git Branch Status
 function fish_right_prompt
-    # Check if we are in a git repo using standard git tools
     if git rev-parse --is-inside-work-tree >/dev/null 2>&1
-        set_color cyan
+        set_color brcyan
         echo -n (fish_git_prompt)
         set_color normal
     end
 end
+
+# --- NEW UNIVERSITY ALIASES ---
+alias unilog="tail -f ~/cachyos-config/sync.log"
+alias unisync="bash ~/cachyos-config/uni-sync.sh"
 alias uni-status='mutagen sync list && echo "--- Hub Connectivity ---" && ping -c 1 100.70.100.118 | grep "time="'
 set -gx EDITOR micro
 set -gx VISUAL micro

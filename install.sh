@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REPO_DIR="$HOME/cachyos-setup"
+REPO_DIR="$HOME/cachyos-config"
 HOSTNAME=$(hostname)
 
 echo "🚀 Environment Restore for: $HOSTNAME"
@@ -18,10 +18,21 @@ elif [[ "$HOSTNAME" == *"desktop"* ]]; then
 else
     echo "⚠️ Unknown host ($HOSTNAME). Manual SSH setup required."
 fi
-
 chmod 600 ~/.ssh/config
 
-# 2. Systemd Integration
+# 2. Fish Configuration (Syncing Aliases & Prompts)
+echo "🐟 Syncing Fish configuration..."
+mkdir -p ~/.config/fish
+if [ -f "$REPO_DIR/config.fish" ]; then
+    # Backup existing config if it's not a link or already managed
+    cp ~/.config/fish/config.fish ~/.config/fish/config.fish.bak 2>/dev/null
+    cp "$REPO_DIR/config.fish" ~/.config/fish/config.fish
+    echo "✅ Fish config updated from repo"
+else
+    echo "⚠️ config.fish not found in repo, skipping..."
+fi
+
+# 3. Systemd Integration
 echo "⚙️ Linking Systemd units..."
 sudo ln -sf "$REPO_DIR/systemd/uni-sync.service" /etc/systemd/system/uni-sync.service
 sudo ln -sf "$REPO_DIR/systemd/uni-sync.timer" /etc/systemd/system/uni-sync.timer

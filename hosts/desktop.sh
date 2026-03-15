@@ -8,7 +8,7 @@ echo "🎮 Configuring Desktop for Blackwell GPU & University Workflow..."
 # whenever CachyOS updates your kernel (which happens often!)
 sudo pacman -S --needed --noconfirm \
     cachyos-gaming-meta \
-    nvidia-cachyos-dkms \
+    nvidia-dkms \
     lib32-nvidia-utils-cachyos \
     nvidia-settings \
     cuda
@@ -37,7 +37,7 @@ fi
 # 5. RGB Control (OpenRGB)
 echo "Instaling OpenRGB for Blackwell/System lighting..."
 # openrgb-dkms-git ensures the i2c-piix4 and i2c-nvidia-drivers are rebuilt for my CachyOS kernel
-paru -S --needed --noconfirm openrgb-dkms-git
+paru -S --needed --noconfirm openrgb
 
 # Enable the OpenRGB SDK server for background control
 sudo systemctl enable --now openrgb.service

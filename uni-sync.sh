@@ -1,31 +1,22 @@
 #!/bin/bash
-# --- Settings ---
-SOURCE="/home/michael/Documents/University/"
-HDD_DEST="/run/media/michael/Rem Backup/University/"
-REMOTE_IP="100.70.100.118" # Use Tailscale IP for universal access"
-REMOTE_DEST="michael@$REMOTE_IP:/home/michael/University/"
-LOG="/home/michael/cachyos-config/sync.log"
 
-# --- 1. LOCAL HDD SYNC ---
-if [ -d "$HDD_DEST" ]; then
-    echo "$(date) - [HDD] Syncing to External Drive..." >> "$LOG"
-    rsync -avzuL --partial --delete --stats --human-readable "$SOURCE" "$HDD_DEST" >> "$LOG" 2>&1
+# 1. Grab the active Source IP
+CURRENT_IP=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+')
+
+# 2. MANDATORY Backup to External HDD (The Safety Net)
+if [ -d "/mnt/External_Backup" ]; then
+    echo "$(date) - [LOCAL] Syncing to WD HDD..." >> ~/cachyos-config/sync.log
+    rsync -avzu --no-perms --no-owner --no-group --exclude=".conda/" ~/Documents/University/ /mnt/External_Backup/University_Backup/
+else
+    echo "$(date) - [ERROR] External HDD not found at /mnt/External_Backup" >> ~/cachyos-config/sync.log
 fi
 
-# --- 2. LAN CHECK (Only .3 or .8) ---
-CURRENT_IP=$(hostname -I | awk '{print $1}')
-
-if [[ $CURRENT_IP == 192.168.8.* ]] || [[ $CURRENT_IP == 192.168.3.* ]]; then
-    echo "$(date) - [LAN] $CURRENT_IP detected. Fast connection confirmed." >> "$LOG"
-    
-    # Catch-up: HDD to Brain
-    if [ -d "$HDD_DEST" ]; then
-        rsync -avzuL --partial "$HDD_DEST" "$REMOTE_DEST" >> "$LOG" 2>&1
-    fi
-
-    # Finalize: Local to Brain
-    rsync -avzuL --partial "$SOURCE" "$REMOTE_DEST" >> "$LOG" 2>&1
+# 3. Intelligent Network Check for Mini-PC (The Brain)
+if [[ "$CURRENT_IP" =~ ^192\.168\.[38]\. ]]; then
+    NETWORK_STATE="HOME"
+    TARGET_IP="192.168.3.145"
+    echo "$(date) - [HOME] LAN Detected. Syncing to Mini-PC..." >> ~/cachyos-config/sync.log
+    rsync -avzu --no-perms --no-owner --no-group --exclude=".conda/" ~/Documents/University/ michael@$TARGET_IP:/mnt/proxmox_uni/
 else
-    # This is where you'll be at your dad's or Canberra
-    echo "$(date) - [REMOTE] Slow or Unknown Network. Skipping Mini-PC to save bandwidth." >> "$LOG"
+    echo "$(date) - [REMOTE] Outside LAN. Skipping Mini-PC sync." >> ~/cachyos-config/sync.log
 fi

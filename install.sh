@@ -14,9 +14,9 @@ cp ~/cachyos-setup/ssh_config ~/.ssh/config
 chmod 600 ~/.ssh/config
 
 # 3. Systemd Units (The Backup Engine)
-echo "⚙️ Linking Systemd units..."
-sudo ln -sf ~/cachyos-setup/uni-sync.service /etc/systemd/system/uni-sync.service
-sudo ln -sf ~/cachyos-setup/uni-sync.timer /etc/systemd/system/uni-sync.timer
+echo "⚙ Linking Systemd units..."
+sudo ln -sf ~/cachyos-setup/systemd/uni-sync.service /etc/systemd/system/uni-sync.service
+sudo ln -sf ~/cachyos-setup/systemd/uni-sync.timer /etc/systemd/system/uni-sync.timer
 
 # 4. Shell Environment (Fish)
 echo "🐟 Configuring Fish shell (EDITOR=micro)..."

@@ -1,38 +1,31 @@
 #!/bin/bash
-# Path: /home/michael/cachyos-setup/uni-sync.sh
+# --- Settings ---
+SOURCE="/home/michael/Documents/University/"
+HDD_DEST="/run/media/michael/Rem Backup/University/"
+REMOTE_IP="192.168.8.10"
+REMOTE_DEST="michael@$REMOTE_IP:/home/michael/University/"
+LOG="/home/michael/cachyos-config/sync.log"
 
-# --- CONFIGURATION ---
-REMOTE_IP="192.168.8.2" 
-REMOTE_DEST="pve:/home/michael/University" # Updated to point to existing folder
-LOCAL_HDD="/run/media/michael/Rem Backup/University_Backups/" 
-SOURCE="/home/michael/Documents/University/" # Keep trailing slash to follow symlink
-LATENCY_THRESHOLD=10.0 
-LOG="/home/michael/cachyos-setup/sync.log"
-
-echo "--- Sync Started: $(date) ---" >> $LOG
-
-# --- 1. LOCAL EXTERNAL HDD SYNC ---
-# Check if the WD Gaming Drive is mounted
-if [ -d "/run/media/michael/Rem Backup/" ]; then
-    echo "$(date) - WD Drive detected. Starting local backup..." >> $LOG
-    rsync -avzuL --partial --delete \
-        --exclude=".venv/" --exclude="__pycache__/" \
-        "$SOURCE" "/run/media/michael/Rem Backup/University/" >> $LOG 2>&1
-else
-    echo "$(date) - WD Drive NOT found. Skipping local backup." >> $LOG
+# --- 1. LOCAL HDD SYNC ---
+if [ -d "$HDD_DEST" ]; then
+    echo "$(date) - [HDD] Syncing to External Drive..." >> "$LOG"
+    rsync -avzuL --partial --delete --stats --human-readable "$SOURCE" "$HDD_DEST" >> "$LOG" 2>&1
 fi
 
-# --- 2. REMOTE MINI-PC SYNC ---
-# Check latency to the 'Brain'
-LATENCY=$(ping -c 3 $REMOTE_IP | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+# --- 2. LAN CHECK (Only .3 or .8) ---
+CURRENT_IP=$(hostname -I | awk '{print $1}')
 
-if [ ! -z "$LATENCY" ] && (( $(echo "$LATENCY < $LATENCY_THRESHOLD" | bc -l) )); then
-    echo "$(date) - Mini-PC detected (${LATENCY}ms). Starting network backup..." >> $LOG
-    rsync -avzuL --partial --delete \
-        --exclude=".venv/" --exclude="__pycache__/" \
-        "$SOURCE" "$REMOTE_DEST" >> $LOG 2>&1
+if [[ $CURRENT_IP == 192.168.8.* ]] || [[ $CURRENT_IP == 192.168.3.* ]]; then
+    echo "$(date) - [LAN] $CURRENT_IP detected. Fast connection confirmed." >> "$LOG"
+    
+    # Catch-up: HDD to Brain
+    if [ -d "$HDD_DEST" ]; then
+        rsync -avzuL --partial "$HDD_DEST" "$REMOTE_DEST" >> "$LOG" 2>&1
+    fi
+
+    # Finalize: Local to Brain
+    rsync -avzuL --partial "$SOURCE" "$REMOTE_DEST" >> "$LOG" 2>&1
 else
-    echo "$(date) - Mini-PC unreachable or high latency. Skipping network backup." >> $LOG
+    # This is where you'll be at your dad's or Canberra
+    echo "$(date) - [REMOTE] Slow or Unknown Network. Skipping Mini-PC to save bandwidth." >> "$LOG"
 fi
-
-echo "--- All Sync Tasks Finished: $(date) ---" >> $LOG

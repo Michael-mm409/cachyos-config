@@ -1,36 +1,32 @@
 #!/bin/bash
 
-echo "🚀 Starting Full CachyOS Environment Restore..."
+REPO_DIR="$HOME/cachyos-setup"
+HOSTNAME=$(hostname)
 
-# 1. Fix Ownership & Permissions
-echo "🔐 Repairing permissions..."
-sudo chown -R michael:michael ~/cachyos-setup/
-chmod +x ~/cachyos-setup/*.sh
+echo "🚀 Environment Restore for: $HOSTNAME"
 
-# 2. SSH Configuration
-echo "🔑 Setting up SSH config..."
+# 1. SSH Configuration Pick-and-Place
+echo "🔑 Selecting SSH profile for $HOSTNAME..."
 mkdir -p ~/.ssh
-cp ~/cachyos-setup/ssh_config ~/.ssh/config
-chmod 600 ~/.ssh/config
 
-# 3. Systemd Units (The Backup Engine)
-echo "⚙ Linking Systemd units..."
-sudo ln -sf ~/cachyos-setup/systemd/uni-sync.service /etc/systemd/system/uni-sync.service
-sudo ln -sf ~/cachyos-setup/systemd/uni-sync.timer /etc/systemd/system/uni-sync.timer
-
-# 4. Shell Environment (Fish)
-echo "🐟 Configuring Fish shell (EDITOR=micro)..."
-mkdir -p ~/.config/fish
-if ! grep -q "EDITOR micro" ~/.config/fish/config.fish; then
-    echo 'set -gx EDITOR micro' >> ~/.config/fish/config.fish
-    echo 'set -gx VISUAL micro' >> ~/.config/fish/config.fish
+if [[ "$HOSTNAME" == *"laptop"* ]]; then
+    cp "$REPO_DIR/ssh_config_laptop" ~/.ssh/config
+    echo "✅ Applied Laptop SSH Profile"
+elif [[ "$HOSTNAME" == *"desktop"* ]]; then
+    cp "$REPO_DIR/ssh_config_desktop" ~/.ssh/config
+    echo "✅ Applied Desktop SSH Profile"
+else
+    echo "⚠️ Unknown host ($HOSTNAME). Manual SSH setup required."
 fi
 
-# 5. Reload and Fire
-echo "🔄 Reloading system services..."
+chmod 600 ~/.ssh/config
+
+# 2. Systemd Integration
+echo "⚙️ Linking Systemd units..."
+sudo ln -sf "$REPO_DIR/systemd/uni-sync.service" /etc/systemd/system/uni-sync.service
+sudo ln -sf "$REPO_DIR/systemd/uni-sync.timer" /etc/systemd/system/uni-sync.timer
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now uni-sync.timer
 
-echo "✅ ALL SYSTEMS OPERATIONAL"
-echo "-----------------------------------------------"
-systemctl list-timers uni-sync.timer
+echo "✅ Deployment complete for $HOSTNAME."

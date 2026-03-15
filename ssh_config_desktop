@@ -1,0 +1,16 @@
+# --- Desktop SSH Config (Michael) ---
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/id_ed25519_desktop
+
+Host brain pve
+    HostName 100.70.100.118
+    User michael
+    IdentityFile ~/.ssh/id_ed25519_desktop
+
+Host *
+    AddKeysToAgent yes
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/id_ed25519_desktop
+    ServerAliveInterval 60

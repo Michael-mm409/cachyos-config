@@ -2,7 +2,7 @@
 # --- Settings ---
 SOURCE="/home/michael/Documents/University/"
 HDD_DEST="/run/media/michael/Rem Backup/University/"
-REMOTE_IP="192.168.8.10"
+REMOTE_IP="100.70.100.118" # Use Tailscale IP for universal access"
 REMOTE_DEST="michael@$REMOTE_IP:/home/michael/University/"
 LOG="/home/michael/cachyos-config/sync.log"
 

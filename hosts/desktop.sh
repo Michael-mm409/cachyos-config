@@ -11,7 +11,8 @@ sudo pacman -S --needed --noconfirm \
     nvidia-dkms \
     lib32-nvidia-utils-cachyos \
     nvidia-settings \
-    cuda
+    cuda \
+    direnv
 
 # 2. NVIDIA Power Management & Sleep Fixes
 # Critical for Blackwell: Preserves VRAM state during sleep to prevent crashes
@@ -25,7 +26,7 @@ fi
 
 # 3. Create Local University Folders (Michael's Directory Structure)
 echo "📂 Initializing University directory structure..."
-mkdir -p "$HOME/Documents/University"
+mkdir -p "/mnt/Data/University"
 mkdir -p "$HOME/Synology_Home"
 
 # 4. Performance Tuning (Optional but recommended for Desktop)

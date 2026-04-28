@@ -3,6 +3,9 @@
 
 echo "🔋 Tuning IdeaPad for Battery & Data Science Mobility..."
 
+# 0. Install all apps
+sudo pacman -S direnv
+
 # 1. Power Management (Auto-Scaling)
 # auto-cpufreq is better than powertop for modern Ryzen/Intel IdeaPads
 paru -S --needed --noconfirm auto-cpufreq

@@ -1,3 +1,5 @@
+# ~/.zshrc
+
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -8,8 +10,6 @@ fi
 source /usr/share/cachyos-zsh-config/cachyos-config.zsh
 source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
 source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
-# ~/.zshrc
 
 # 0. CACHYOS INTEGRATION
 # Note: Zsh doesn't use the fish-config, but CachyOS has zsh defaults too.
@@ -37,75 +37,85 @@ export GTK_USE_PORTAL=1
 export XDG_CURRENT_DESKTOP=KDE
 export XDG_MENU_PREFIX=plasma-
 
-# 3. SSH AGENT AUTO-START
+# 3. FAST SSH AGENT (Safe Version)
 if ! pgrep -u $USER ssh-agent > /dev/null; then
     eval $(ssh-agent -s) > /dev/null
 else
-    export SSH_AUTH_SOCK=$(find /tmp -type s -name "agent.*" -user $USER 2>/dev/null | head -n 1)
+    # (N) prevents the "no matches found" error if the folder is empty
+    export SSH_AUTH_SOCK=$(echo /tmp/ssh-*/agent.*(N[1]))
 fi
 
-# Add key if it's not already loaded
-if ! ssh-add -l >/dev/null 2>&1; then
-    if [[ -f ~/.ssh/id_ed25519_desktop ]]; then
-        ssh-add ~/.ssh/id_ed25519_desktop 2>/dev/null
-    fi
-fi
-
-# 4. CONDA INITIALIZATION
-if [ -f "/opt/miniconda3/bin/conda" ]; then
-    __conda_setup="$('/opt/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
-    if [ $? -eq 0 ]; then
-        eval "$__conda_setup"
-    else
-        if [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
-            . "/opt/miniconda3/etc/profile.d/conda.sh"
-        else
-            export PATH="/opt/miniconda3/bin:$PATH"
-        fi
-    fi
-    unset __conda_setup
+# 4. FAST CONDA INITIALIZATION
+if [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
+    . "/opt/miniconda3/etc/profile.d/conda.sh"
+else
+    export PATH="/opt/miniconda3/bin:$PATH"
 fi
 
 # 5. UNIVERSITY AUTO-ENV SYNC (Zsh chpwd function)
 # In Zsh, 'chpwd' runs automatically whenever you change directories
 university_auto_env_sync() {
-    local uni_base="$HOME/Documents/University"
-    
-    # 1. THE EXIT GUARD: If we leave the University root entirely
-    if [[ "$PWD" != "$uni_base"* ]]; then
-        if [[ -n "$CONDA_DEFAULT_ENV" ]]; then
-            conda deactivate
-        fi
-        return
-    fi
+	# Define your two valid university roots
+	local root_home="$HOME/Documents/University"
+	local root_mnt="/mnt/Data/University"
 
-    # 2. FIND THE SUBJECT FOLDER: Look up the path for "Code - Name"
-    # This works even if you are 5 folders deep in 'Assessments/Final/Code'
-    local subject_path=$(echo "$PWD" | grep -oP "$uni_base/.*?/[^/]+ - [^/]+")
-    
-    if [[ -n "$subject_path" ]]; then
-        # Extract just the code (e.g., CSC5020)
-        local subject_folder="${subject_path##*/}"
-        local subject_code="${subject_folder%% - *}"
         
-        # 3. ACTIVATION LOGIC
-        if [[ -d "$HOME/.conda/envs/$subject_code" ]]; then
-            if [[ "$CONDA_DEFAULT_ENV" != "$subject_code" ]]; then
-                conda activate "$subject_code"
-            fi
-            return
-        fi
-    fi
+	# NEW: Check if the paths even exist. If not, treat them as empty strings.
+	# This prevents the script from trying to 'cd' or 'grep' non-existent paths.
+	[[ ! -d "$root_home" ]] && root_home="/dev/null"
+	[[ ! -d "$root_mnt" ]] && root_mnt="/dev/null"
 
-    # 4. THE NEUTRAL ZONE: If in University but not in a subject subfolder
-    if [[ -n "$CONDA_DEFAULT_ENV" && "$CONDA_DEFAULT_ENV" != "base" ]]; then
-        conda deactivate
-    fi
+	# 1. THE EXIT GUARD      
+	 
+	if [[ "$PWD" != "$root_home"* ]] && [[ "$PWD" != "$root_mnt"* ]]; then
+	   if [[ -n "$CONDA_DEFAULT_ENV" ]]; then
+	       conda deactivate
+	   fi
+	  return
+	fi
+
+	# 2. FIND THE SUBJECT CODE: 
+	# This regex looks for the pattern "CODE - Name" (e.g., CSC5020 - Foundations)
+	# It works regardless of which drive you are on.
+	local subject_code=$(echo "$PWD" | grep -oP "(?<=[0-9]{4}/)[A-Z]{3}[0-9]{4}(?= - )" | head -n 1)
+
+	# Fallback: if the above specific year-folder regex fails, 
+	# just look for any 3-letter, 4-number combo in the path
+	if [[ -z "$subject_code" ]]; then
+	   subject_code=$(echo "$PWD" | grep -oP "[A-Z]{3}[0-9]{4}" | head -n 1)
+	fi
+
+	# 3. ACTIVATION LOGIC
+	if [[ -n "$subject_code" ]]; then
+	   if [[ -d "$HOME/.conda/envs/$subject_code" ]]; then
+	       if [[ "$CONDA_DEFAULT_ENV" != "$subject_code" ]]; then
+	           conda activate "$subject_code"
+	       fi
+	       return
+	   fi
+	fi
+
+	# 4. NEUTRAL ZONE: If in a Uni folder but no environment matches, go to base
+	if [[ -n "$CONDA_DEFAULT_ENV" && "$CONDA_DEFAULT_ENV" != "base" ]]; then
+	   conda activate base
+	fi
 }
 
 # Add the function to the list of directory change hooks
 autoload -U add-zsh-hook
 add-zsh-hook chpwd university_auto_env_sync
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+# Run the sync once on shell startup to catch VS Code/Login sessions
+university_auto_env_sync
+
+# 6. PERSONAL PROJECT AUTOMATION (direnv)
+# This handles any folder with a .envrc file
+if command -v direnv > /dev/null; then
+    eval "$(direnv hook zsh)"
+fi
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh

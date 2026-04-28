@@ -16,7 +16,7 @@
 'builtin' 'local' '-a' 'p10k_config_opts'
 [[ ! -o 'aliases'         ]] || p10k_config_opts+=('aliases')
 [[ ! -o 'sh_glob'         ]] || p10k_config_opts+=('sh_glob')
-[[ ! -o 'no_brace_expand' ]] || p10k_config_opts+=('no_brace_expand')
+[[ ! -o 'no_brace_expand' ]] || p10k_config_POWERLEVEL9K_LEFT_PROMPT_ELEMENTSopts+=('no_brace_expand')
 'builtin' 'setopt' 'no_aliases' 'no_sh_glob' 'brace_expand'
 
 () {
@@ -33,6 +33,7 @@
   typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
     # =========================[ Line #1 ]=========================
     os_icon                 # os identifier
+    context                 # User info
     dir                     # current directory
     vcs                     # git status
     # =========================[ Line #2 ]=========================
@@ -191,11 +192,11 @@
 
   #################################[ os_icon: os identifier ]##################################
   # OS identifier color.
-  typeset -g POWERLEVEL9K_OS_ICON_FOREGROUND=232
+  typeset -g POWERLEVEL9K_OS_ICON_FOREGROUND=82
   typeset -g POWERLEVEL9K_OS_ICON_BACKGROUND=7
   # Custom icon.
-  # typeset -g POWERLEVEL9K_OS_ICON_CONTENT_EXPANSION='⭐'
-
+  typeset -g POWERLEVEL9K_OS_ICON_CONTENT_EXPANSION='󰣇'
+ 
   ################################[ prompt_char: prompt symbol ]################################
   # Transparent background.
   typeset -g POWERLEVEL9K_PROMPT_CHAR_BACKGROUND=
@@ -591,24 +592,24 @@
 
   # There are four parameters that can be used to hide asdf tools. Each parameter describes
   # conditions under which a tool gets hidden. Parameters can hide tools but not unhide them. If at
-  # least one parameter decides to hide a tool, that tool gets hidden. If no parameter decides to
-  # hide a tool, it gets shown.
-  #
-  # Special note on the difference between POWERLEVEL9K_ASDF_SOURCES and
-  # POWERLEVEL9K_ASDF_PROMPT_ALWAYS_SHOW. Consider the effect of the following commands:
-  #
-  #   asdf local  python 3.8.1
-  #   asdf global python 3.8.1
-  #
-  # After running both commands the current python version is 3.8.1 and its source is "local" as
-  # it takes precedence over "global". If POWERLEVEL9K_ASDF_PROMPT_ALWAYS_SHOW is set to false,
-  # it'll hide python version in this case because 3.8.1 is the same as the global version.
-  # POWERLEVEL9K_ASDF_SOURCES will hide python version only if the value of this parameter doesn't
-  # contain "local".
-
-  # Hide tool versions that don't come from one of these sources.
-  #
-  # Available sources:
+    # least one parameter decides to hide a tool, that tool gets hidden. If no parameter decides to
+    # hide a tool, it gets shown.
+    #
+    # Special note on the difference between POWERLEVEL9K_ASDF_SOURCES and
+    # POWERLEVEL9K_ASDF_PROMPT_ALWAYS_SHOW. Consider the effect of the following commands:
+    #
+    #   asdf local  python 3.8.1
+    #   asdf global python 3.8.1
+    #
+    # After running both commands the current python version is 3.8.1 and its source is "local" as
+    # it takes precedence over "global". If POWERLEVEL9K_ASDF_PROMPT_ALWAYS_SHOW is set to false,
+    # it'll hide python version in this case because 3.8.1 is the same as the global version.
+    # POWERLEVEL9K_ASDF_SOURCES will hide python version only if the value of this parameter doesn't
+    # contain "local".
+  
+    # Hide tool versions that don't come from one of these sources.
+    #
+    # Available sources:
   #
   # - shell   `asdf current` says "set by ASDF_${TOOL}_VERSION environment variable"
   # - local   `asdf current` says "set by /some/not/home/directory/file"
@@ -978,8 +979,8 @@
   typeset -g POWERLEVEL9K_CONTEXT_{REMOTE,REMOTE_SUDO}_FOREGROUND=3
   typeset -g POWERLEVEL9K_CONTEXT_{REMOTE,REMOTE_SUDO}_BACKGROUND=0
   # Default context color (no privileges, no SSH).
-  typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=3
-  typeset -g POWERLEVEL9K_CONTEXT_BACKGROUND=0
+  typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=7
+  typeset -g POWERLEVEL9K_CONTEXT_BACKGROUND=4
 
   # Context format when running with privileges: user@hostname.
   typeset -g POWERLEVEL9K_CONTEXT_ROOT_TEMPLATE='%n@%m'
@@ -991,9 +992,9 @@
   # Don't show context unless running with privileges or in SSH.
   # Tip: Remove the next line to always show context.
   typeset -g POWERLEVEL9K_CONTEXT_{DEFAULT,SUDO}_{CONTENT,VISUAL_IDENTIFIER}_EXPANSION=
-
+  typeset -g POWERLEVEL9K_CONTEXT_ALWAYS_SHOW=true
   # Custom icon.
-  # typeset -g POWERLEVEL9K_CONTEXT_VISUAL_IDENTIFIER_EXPANSION='⭐'
+  typeset -g POWERLEVEL9K_CONTEXT_VISUAL_IDENTIFIER_EXPANSION=''
   # Custom prefix.
   # typeset -g POWERLEVEL9K_CONTEXT_PREFIX='with '
 
@@ -1841,3 +1842,19 @@ typeset -g POWERLEVEL9K_CONFIG_FILE=${${(%):-%x}:a}
 
 (( ${#p10k_config_opts} )) && setopt ${p10k_config_opts[@]}
 'builtin' 'unset' 'p10k_config_opts'
+
+
+# 1. Force the context segment to always be visible
+typeset -g POWERLEVEL9K_CONTEXT_ALWAYS_SHOW=true
+
+# 2. Define what to show (User @ Hostname)
+typeset -g POWERLEVEL9K_CONTEXT_TEMPLATE='%n@%m'
+
+# 3. Prevent it from hiding when you are the default user
+typeset -g POWERLEVEL9K_CONTEXT_DEFAULT_CONTENT_EXPANSION='%n@%m'
+
+# Background color (e.g., 208 is Orange, 4 is Blue, 2 is Green)
+typeset -g POWERLEVEL9K_CONTEXT_BACKGROUND=208
+
+# Foreground color (0 is Black, 15 is White)
+typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=0

@@ -91,4 +91,34 @@ done
 
 sudo systemctl daemon-reload
 
+# 8. Multi-Format Icon Mapping
+APPS_DIR="$HOME/.local/share/applications"
+ICON_PATH="$HOME/.local/share/icons/custom"
+
+# This logic finds the icon file regardless of extension (.png, .svg, .webp)
+find_icon() {
+    # Searches for a file starting with the prefix in your Icons folder
+    find "$ICON_PATH" -name "$1.*" -print -quit
+}
+
+echo "🎨 Mapping icons (SVG/PNG/WebP supported)..."
+
+# Example for Google Gemini
+GEMINI_FILE=$(grep -l "Name=Google Gemini" "$APPS_DIR"/brave-*.desktop)
+GEMINI_ICON=$(find_icon "google-gemini-icon")
+
+if [ -n "$GEMINI_FILE" ] && [ -n "$GEMINI_ICON" ]; then
+    sed -i "s|^Icon=.*|Icon=$GEMINI_ICON|" "$GEMINI_FILE"
+    echo "✅ Applied Gemini icon: $(basename "$GEMINI_ICON")"
+fi
+
+# Run the Bluetooth audio setup script safely
+if [ -f "./fix-bluetooth-audio.sh" ]; then
+    echo "--> Launching Bluetooth audio fixes..."
+    chmod +x ./fix-bluetooth-audio.sh
+    ./fix-bluetooth-audio.sh
+else
+    echo "Warning: fix-bluetooth-audio.sh not found."
+fi
+
 echo "✅ CachyOS Setup Complete!"

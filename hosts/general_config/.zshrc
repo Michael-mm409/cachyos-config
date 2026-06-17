@@ -3,6 +3,7 @@
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
+typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
@@ -16,17 +17,26 @@ source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zs
 [[ -f /usr/share/zsh/scripts/antidote/antidote.zsh ]] && source /usr/share/zsh/scripts/antidote/antidote.zsh
 
 # 1. ALIASES
-alias ls='ls --color=auto'
-alias grep='grep --color=auto'
 alias resource='source ~/.zshrc'
-alias bashrc='micro ~/.zshrc'
+alias zshrc='micro ~/.zshrc'
 alias obsidian='obsidian --enable-features=UseOzonePlatform --ozone-platform=wayland'
 
+alias mds-bak="sh ~/scripts/mds_backup.sh"
 alias uni-pull='rsync -avzu --no-perms --no-owner --no-group --exclude=".conda/" /mnt/proxmox_uni/ ~/Documents/University/'
 alias uni-push='rsync -avzu --no-perms --no-owner --no-group --exclude=".conda/" ~/Documents/University/ /mnt/Synology_Home/Documents/University/University/'
 alias uni-status='mutagen sync list && echo "--- Hub Connectivity ---" && ping -c 1 100.70.100.118 | grep "time="'
 alias unisync='/usr/local/bin/unisync'
 alias unilog='tail -f ~/cachyos-config/sync.log'
+
+alias lab-push="~/Big-Data-Cluster/infra/sync_labs.sh --push"
+alias lab-pull="~/Big-Data-Cluster/infra/sync_labs.sh --pull"
+
+# =====================================================================
+# 🗄 MULTI-DEVICE COMPATIBLE CLIENT ALIASES (The Pure Way)
+# =====================================================================
+
+# Dynamically pull in shared university data science shortcuts
+[[ -f ~/Big-Data-Cluster/zshrc_aliases.txt ]] && source ~/Big-Data-Cluster/zshrc_aliases.txt
 
 # 2. ENVIRONMENT VARIABLES
 export TERM=xterm-256color
@@ -41,16 +51,28 @@ export XDG_MENU_PREFIX=plasma-
 if ! pgrep -u $USER ssh-agent > /dev/null; then
     eval $(ssh-agent -s) > /dev/null
 else
-    # (N) prevents the "no matches found" error if the folder is empty
-    export SSH_AUTH_SOCK=$(echo /tmp/ssh-*/agent.*(N[1]))
+    # Native Zsh globbing assignment (N[1] extracts the first match cleanly)
+    local active_sockets=( /tmp/ssh-*/agent.*(N[1]) )
+    [[ -n $active_sockets ]] && export SSH_AUTH_SOCK=$active_sockets
 fi
 
 # 4. FAST CONDA INITIALIZATION
-if [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
-    . "/opt/miniconda3/etc/profile.d/conda.sh"
+
+# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !!
+__conda_setup="$('/opt/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__conda_setup"
 else
-    export PATH="/opt/miniconda3/bin:$PATH"
+    if [ -f "/opt/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "/opt/miniconda3/etc/profile.d/conda.sh"
+    else
+        export PATH="/opt/miniconda3/bin:$PATH"
+    fi
 fi
+unset __conda_setup
+# <<< conda initialize <<<
+
 
 # 5. UNIVERSITY AUTO-ENV SYNC
 university_auto_env_sync() {
@@ -100,3 +122,5 @@ fi
 
 # 7. THE FINAL WORD (Source p10k ONCE at the very end)
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+export PATH="$HOME/.local/bin:$PATH"

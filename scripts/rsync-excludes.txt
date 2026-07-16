@@ -1,0 +1,20 @@
+.stfolder
+.stversions
+.ipynb_checkpoints
+__pycache__
+.venv
+cmake-build-debug
+CMakeFiles
+.~lock.*
+.~lock.*#
+.DS_Store
+*.tmp
+UOW/
+.Trash*
+
+# --- Targeted Dataset Exclusion ---
+# This single rule stops rsync from ever entering the 50GB dataset folder,
+# while completely protecting your coursework and "Proof of work" steps.
+**/61499v001/
+
+backups/**

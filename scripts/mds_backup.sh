@@ -3,12 +3,18 @@
 # Refactored: Two-Stage "Push then Purge" (Laptop = Absolute Source of Truth)
 
 # --- 1. CONFIGURATION ---
-SOURCE="/mnt/Data/University/"
-SNAPSHOT_ROOT="/mnt/Data/University/snapshots"
-LOCAL_VAULT="/mnt/MDS_VAULT/University_Vault/"  # Your secondary USB
-DOW=$(date +%u)
-TIMESTAMP=$(date +%Y%m%d)
-EXCLUDES="$HOME/scripts/rsync-excludes.txt"
+if [ -d "/mnt/Data/University/" ]; then
+    SOURCE="/mnt/Data/University/"
+    SNAPSHOT_ROOT="/mnt/Data/University/snapshots"
+    EXCLUDES="$HOME/fedora-config/scripts/rsync-excludes.txt"
+elif [ -d "$HOME/Documents/University/" ]; then
+    SOURCE="$HOME/Documents/University/"
+    SNAPSHOT_ROOT="$HOME/Documents/University/snapshots"
+    EXCLUDES="$HOME/fedora-config/scripts/rsync-excludes.txt"
+else
+    echo "⚠ CRITICAL ERROR: Could not locate University directory!"
+    exit 1
+fi
 
 # --- DYNAMIC NETWORK ROUTING VALVE ---
 if ping -c 1 -W 1 192.168.8.2 > /dev/null 2>&1; then
@@ -38,18 +44,30 @@ fi
 
 mkdir -p "$SNAPSHOT_ROOT"
 
-# --- PHASE 1: TWO-STAGE MINI PC SYNC (LAPTOP -> MINI PC) ---
-echo "--- Step 1a: Pushing New/Updated Data to Mini PC ---"
-# Pure copy. -cv forces checksum checking instead of modification time comparisons!
-rsync -cv \
+# --- NEW GUARDIAN LAYER: PRE-BACKUP CONVERGENT PULL ---
+echo "🔄 Phase 0: Checking for newer updates on the Mini PC hub..."
+if [ -f "./mds_pull.sh" ]; then
+    sh ./mds_pull.sh
+    if [ $? -ne 0 ]; then
+        echo "⚠ WARNING: Pre-backup pull failed or skipped. Proceeding cautiously..."
+    else
+        echo "✅ Pre-backup sync complete. Local directory is fully up to date."
+    fi
+else
+    echo "ℹ INFO: mds_pull.sh not found in the current directory. Skipping pre-sync."
+fi
+
+# --- PHASE 1: SAFE ADDITIVE SYNC (LOCAL -> MINI PC) ---
+echo "--- Step 1: Pushing New and Updated Data to Mini PC ---"
+
+rsync -auv \
    -e "ssh $SSH_OPTS" \
    --exclude-from="$EXCLUDES" \
    --exclude="snapshots/" \
    "$SOURCE" "$REMOTE_TARGET"
 
-# Check if the push succeeded. If it failed (e.g., network dropped), DO NOT PURGE.
 if [ $? -ne 0 ]; then
-   echo "⚠ CRITICAL: Step 1a Push failed! Skipping cleanup step to protect data."
+   echo "⚠ CRITICAL: Step 1 Push failed! Aborting."
    exit 1
 fi
 
@@ -120,4 +138,4 @@ fi
 echo "--- Step 6: Triggering Global Lab Sync on Remote Mini PC ---"
 ssh $SSH_OPTS "michael@$SSH_HOST" "nohup /home/michael/scripts/global_lab_sync.sh > /dev/null 2>&1 &"
 
-echo "Last Global Sync: $(date)" > /mnt/Data/University/sync_status.txt
+echo "Last Global Sync: $(date)" > "${SOURCE}sync_status.txt"

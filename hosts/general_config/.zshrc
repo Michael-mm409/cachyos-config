@@ -73,6 +73,8 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
+# Big Data Cluster tools
+export PATH="$HOME/Big-Data-Cluster/bin:$PATH"
 
 # 5. UNIVERSITY AUTO-ENV SYNC
 university_auto_env_sync() {
@@ -120,7 +122,18 @@ if command -v direnv > /dev/null; then
     eval "$(direnv hook zsh)"
 fi
 
+if [[ -f ~/Big-Data-Cluster/.env ]]; then
+  source ~/Big-Data-Cluster/.env
+fi
+
+spark-master() {
+  local rel_dir="${PWD#$COURSE_WORKSPACE}"
+
+  docker exec -it spark-master \
+    /opt/spark/bin/spark-submit "/course/${rel_dir}/$1"
+}
 # 7. THE FINAL WORD (Source p10k ONCE at the very end)
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 export PATH="$HOME/.local/bin:$PATH"
+

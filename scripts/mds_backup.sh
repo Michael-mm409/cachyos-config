@@ -53,7 +53,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "--- Step 1b: Pushing New/Updated Data to Mini PC ---"
-eval rsync -cv \
+eval rsync -av \
     -e '"ssh '$SSH_OPTS'"' \
     --exclude-from="$EXCLUDES" \
     --exclude="snapshots/" \

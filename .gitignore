@@ -11,3 +11,14 @@ push_log.txt
 
 # OS Junk
 .DS_Store
+
+# Environmental configuration (Secrets / Machine-specific paths)
+*.env
+*.env.*
+!.env.example
+
+# Temporary sync logs & status files
+sync_status.txt
+
+# Local archives/snapshots if created inside repo
+*.tar.gz

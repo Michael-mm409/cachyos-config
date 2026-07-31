@@ -15,7 +15,7 @@ push_log.txt
 # Environmental configuration (Secrets / Machine-specific paths)
 *.env
 *.env.*
-!.env.example
+!*.env.example
 
 # Temporary sync logs & status files
 sync_status.txt

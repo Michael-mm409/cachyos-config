@@ -1,27 +1,29 @@
 #!/bin/bash
 # Michael's MDS Hybrid Backup (Daily Incremental / Weekly Full)
-# Refactored: Bidirectional Sync (Pull remote changes first, then Push & Purge)
+# Refactored: Environment-driven configuration with Bidirectional Sync
 
-# --- 1. CONFIGURATION ---
-SOURCE="/mnt/Data/University/"
-SNAPSHOT_ROOT="/mnt/Data/University/snapshots"
-LOCAL_VAULT="/mnt/MDS_VAULT/University_Vault/"  # Your secondary USB
+# --- 0. SOURCE ENVIRONMENT CONFIGURATION ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/mds_backup.env"
+
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    source "$ENV_FILE"
+    set +a
+else
+    echo "⚠ CRITICAL ERROR: Configuration file '$ENV_FILE' not found! Aborting."
+    exit 1
+fi
+
+# Set runtime variables derived from configuration
 DOW=$(date +%u)
 TIMESTAMP=$(date +%Y%m%d)
-EXCLUDES="$HOME/scripts/rsync-excludes.txt"
 
-# --- DYNAMIC NETWORK ROUTING VALVE ---
-if ping -c 1 -W 1 192.168.8.2 > /dev/null 2>&1; then
-    echo "🏠 Connected to home network. Using fast direct IP."
-    SSH_OPTS="-i /home/michael/.ssh/id_ed25519_desktop -o StrictHostKeyChecking=no"
-    REMOTE_TARGET="michael@192.168.8.2:/home/michael/University/"
-    SSH_HOST="192.168.8.2"
-else
-    echo "🚗 Away from home. Routing backup via Tailscale tunnel."
-    SSH_OPTS="-i /home/michael/.ssh/id_ed25519_desktop"
-    REMOTE_TARGET="michael@pve:/home/michael/University/"
-    SSH_HOST="pve"
-fi
+# --- 1. NETWORK TARGET SETUP (MagicDNS) ---
+SSH_OPTS="-i ${SSH_KEY}"
+SSH_HOST="${REMOTE_HOST}"
+REMOTE_TARGET="${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}"
+REMOTE_CHECK_DIR="${REMOTE_PATH}"
 
 # --- GUARDIAN LAYER: ANTI-WIPE VALVE ---
 if [ ! -d "$SOURCE" ] || [ -z "$(ls -A "$SOURCE" 2>/dev/null)" ]; then
@@ -29,7 +31,7 @@ if [ ! -d "$SOURCE" ] || [ -z "$(ls -A "$SOURCE" 2>/dev/null)" ]; then
     exit 1
 fi
 
-if ! ssh $SSH_OPTS "michael@$SSH_HOST" "[ -d /home/michael/University/ ]"; then
+if ! ssh $SSH_OPTS "${REMOTE_USER}@${SSH_HOST}" "[ -d '${REMOTE_CHECK_DIR}' ]"; then
     echo "⚠ CRITICAL ERROR: Remote target directory does not exist on Mini PC! Aborting."
     exit 1
 fi
@@ -39,8 +41,6 @@ mkdir -p "$SNAPSHOT_ROOT"
 # --- PHASE 1: THREE-STAGE BIDIRECTIONAL MINI PC SYNC ---
 
 echo "--- Step 1a: Pulling New/Updated Data from Mini PC ---"
-# Pulls files created/updated on the remote server back to your laptop first
-# -u ensures newer local files on your laptop won't be overwritten by older remote files
 eval rsync -av -u \
     -e '"ssh '$SSH_OPTS'"' \
     --exclude-from="$EXCLUDES" \
@@ -53,7 +53,6 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "--- Step 1b: Pushing New/Updated Data to Mini PC ---"
-# Pure copy push from Laptop -> Remote server
 eval rsync -cv \
     -e '"ssh '$SSH_OPTS'"' \
     --exclude-from="$EXCLUDES" \
@@ -66,13 +65,11 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "--- Step 1c: Purging Discarded Files on Mini PC ---"
-# Purges remote files that were deleted on the laptop (safe because 1a pulled remote additions first)
 eval rsync -av --delete --existing \
     -e '"ssh '$SSH_OPTS'"' \
     --exclude-from="$EXCLUDES" \
     --exclude="snapshots/" \
     "$SOURCE" "$REMOTE_TARGET"
-
 
 # --- PHASE 2: TWO-STAGE LOCAL USB VAULT SYNC (LAPTOP -> USB VAULT) ---
 if [ -d "$LOCAL_VAULT" ]; then
@@ -86,13 +83,11 @@ if [ -d "$LOCAL_VAULT" ]; then
         echo "⚠ WARNING: USB Vault push failed! Skipping cleanup."
     fi
 else
-    echo "⏸ INFO: USB Vault (/mnt/MDS_VAULT/...) is not connected or mounted. Skipping Step 2."
+    echo "⏸ INFO: USB Vault ($LOCAL_VAULT) is not connected or mounted. Skipping Step 2."
 fi
-
 
 # --- PHASE 3: CATCH-UP ARCHIVING ---
 RECENT_FULL=$(find "$SNAPSHOT_ROOT" -name "MDS_Full_Snapshot_*.tar.gz" -mtime -6 2>/dev/null)
-
 
 # --- PHASE 4: THE HYBRID ARCHIVE LOGIC ---
 if [ "$DOW" -eq 7 ] || [ -z "$RECENT_FULL" ]; then
@@ -119,7 +114,6 @@ else
     find "$SNAPSHOT_ROOT" -maxdepth 1 -name "MDS_Daily_*" -type d -mtime +7 -exec rm -rf {} +
 fi
 
-
 # --- PHASE 5: SNAPSHOT ARCHIVE PIPELINE ---
 if [ -d "$LOCAL_VAULT" ]; then
     echo "--- Syncing Local Snapshots to USB Vault ---"
@@ -129,6 +123,6 @@ fi
 
 # --- PHASE 6: THE LAB CHAIN REACTION ---
 echo "--- Step 6: Triggering Global Lab Sync on Remote Mini PC ---"
-eval ssh $SSH_OPTS "michael@$SSH_HOST" '"nohup /home/michael/scripts/global_lab_sync.sh > /dev/null 2>&1 &"'
+eval ssh $SSH_OPTS "${REMOTE_USER}@${SSH_HOST}" '"nohup '$REMOTE_SYNC_SCRIPT' > /dev/null 2>&1 &"'
 
-echo "Last Global Sync: $(date)" > /mnt/Data/University/sync_status.txt
+echo "Last Global Sync: $(date)" > "$STATUS_FILE"

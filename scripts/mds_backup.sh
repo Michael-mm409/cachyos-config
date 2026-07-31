@@ -1,6 +1,6 @@
 #!/bin/bash
 # Michael's MDS Hybrid Backup (Daily Incremental / Weekly Full)
-# Refactored: Two-Stage "Push then Purge" (Laptop = Absolute Source of Truth)
+# Refactored: Bidirectional Sync (Pull remote changes first, then Push & Purge)
 
 # --- 1. CONFIGURATION ---
 SOURCE="/mnt/Data/University/"
@@ -24,13 +24,11 @@ else
 fi
 
 # --- GUARDIAN LAYER: ANTI-WIPE VALVE ---
-# If your laptop directory is missing or completely empty, STOP IMMEDIATELY.
 if [ ! -d "$SOURCE" ] || [ -z "$(ls -A "$SOURCE" 2>/dev/null)" ]; then
     echo "⚠ CRITICAL ERROR: Laptop University path is missing or empty! Aborting to protect your data."
     exit 1
 fi
 
-# Double check that the Mini PC target folder actually exists before doing anything
 if ! ssh $SSH_OPTS "michael@$SSH_HOST" "[ -d /home/michael/University/ ]"; then
     echo "⚠ CRITICAL ERROR: Remote target directory does not exist on Mini PC! Aborting."
     exit 1
@@ -38,32 +36,45 @@ fi
 
 mkdir -p "$SNAPSHOT_ROOT"
 
-# --- PHASE 1: TWO-STAGE MINI PC SYNC (LAPTOP -> MINI PC) ---
-echo "--- Step 1a: Pushing New/Updated Data to Mini PC ---"
-# Pure copy. -cv forces checksum checking instead of modification time comparisons!
-rsync -cv \
-   -e "ssh $SSH_OPTS" \
-   --exclude-from="$EXCLUDES" \
-   --exclude="snapshots/" \
-   "$SOURCE" "$REMOTE_TARGET"
+# --- PHASE 1: THREE-STAGE BIDIRECTIONAL MINI PC SYNC ---
 
-# Check if the push succeeded. If it failed (e.g., network dropped), DO NOT PURGE.
+echo "--- Step 1a: Pulling New/Updated Data from Mini PC ---"
+# Pulls files created/updated on the remote server back to your laptop first
+# -u ensures newer local files on your laptop won't be overwritten by older remote files
+eval rsync -av -u \
+    -e '"ssh '$SSH_OPTS'"' \
+    --exclude-from="$EXCLUDES" \
+    --exclude="snapshots/" \
+    "$REMOTE_TARGET" "$SOURCE"
+
 if [ $? -ne 0 ]; then
-   echo "⚠ CRITICAL: Step 1a Push failed! Skipping cleanup step to protect data."
-   exit 1
+    echo "⚠ CRITICAL: Step 1a Pull failed! Aborting to prevent data inconsistency."
+    exit 1
 fi
 
-echo "--- Step 1b: Purging Discarded Files on Mini PC ---"
-# Leaves old attributes alone on the target unless the file itself explicitly changed
-rsync -av --delete --existing \
-   -e "ssh $SSH_OPTS" \
-   --exclude-from="$EXCLUDES" \
-   --exclude="snapshots/" \
-   "$SOURCE" "$REMOTE_TARGET"
+echo "--- Step 1b: Pushing New/Updated Data to Mini PC ---"
+# Pure copy push from Laptop -> Remote server
+eval rsync -cv \
+    -e '"ssh '$SSH_OPTS'"' \
+    --exclude-from="$EXCLUDES" \
+    --exclude="snapshots/" \
+    "$SOURCE" "$REMOTE_TARGET"
+
+if [ $? -ne 0 ]; then
+    echo "⚠ CRITICAL: Step 1b Push failed! Skipping cleanup step to protect data."
+    exit 1
+fi
+
+echo "--- Step 1c: Purging Discarded Files on Mini PC ---"
+# Purges remote files that were deleted on the laptop (safe because 1a pulled remote additions first)
+eval rsync -av --delete --existing \
+    -e '"ssh '$SSH_OPTS'"' \
+    --exclude-from="$EXCLUDES" \
+    --exclude="snapshots/" \
+    "$SOURCE" "$REMOTE_TARGET"
 
 
 # --- PHASE 2: TWO-STAGE LOCAL USB VAULT SYNC (LAPTOP -> USB VAULT) ---
-# Safety Check: Verify that the USB vault path is mounted/accessible
 if [ -d "$LOCAL_VAULT" ]; then
     echo "--- Step 2a: Pushing New/Updated Data to USB Vault ---"
     rsync -av --exclude="snapshots/" --exclude-from="$EXCLUDES" "$SOURCE" "$LOCAL_VAULT/Live_Work/"
@@ -113,11 +124,11 @@ fi
 if [ -d "$LOCAL_VAULT" ]; then
     echo "--- Syncing Local Snapshots to USB Vault ---"
     mkdir -p "${LOCAL_VAULT}snapshots/"
-    rsync -av -e "ssh $SSH_OPTS" --exclude="*.tar.gz" "$SNAPSHOT_ROOT/" "${REMOTE_TARGET}snapshots/"
+    eval rsync -av -e '"ssh '$SSH_OPTS'"' --exclude="*.tar.gz" "$SNAPSHOT_ROOT/" "${REMOTE_TARGET}snapshots/"
 fi
 
 # --- PHASE 6: THE LAB CHAIN REACTION ---
 echo "--- Step 6: Triggering Global Lab Sync on Remote Mini PC ---"
-ssh $SSH_OPTS "michael@$SSH_HOST" "nohup /home/michael/scripts/global_lab_sync.sh > /dev/null 2>&1 &"
+eval ssh $SSH_OPTS "michael@$SSH_HOST" '"nohup /home/michael/scripts/global_lab_sync.sh > /dev/null 2>&1 &"'
 
 echo "Last Global Sync: $(date)" > /mnt/Data/University/sync_status.txt
